@@ -5,7 +5,10 @@
 #include <regex>
 #include <string>
 #include <stack>
+#include <iostream>
 
+
+// логика перевода оформлена через словари, чтобы не плодить 'swich case'-ы
 
 std::map<std::string, TYPE> OPERATORS = {
     {"cos", COS}, // косинус
@@ -65,6 +68,8 @@ std::map<TYPE, float(*)(float, float)> functions = {
     {MINUS, [](float a, float b) -> float {return a-b;}}
 };
 
+// аналог std::stof, только для токенов
+
 Token Calculator::str_to_token(std::string& string, std::size_t& position){
     int len = 1;
     while(position+len <= string.size()){
@@ -94,6 +99,7 @@ std::vector<Token> Calculator::tokenisation(std::string expression){
             if(token.type!=ERROR){
                 result.push_back(token);
             }else{
+                // обработка переменных, криво, но работает
                 std::size_t local_pos = pos;
                 while( local_pos != expression.size()){
                     if(NUMBERS.find(expression[local_pos]) != NUMBERS.npos) break;
@@ -116,7 +122,7 @@ float Calculator::calculate(std::string expression){
     if(expression[0] == '-') expression = "0" + expression;
     expression = std::regex_replace(expression, std::regex(R"(\(\-)"), "\(0-");
 
-    float result{};
+    // Алгоритм Дейкстры
     std::vector<Token> input = tokenisation(expression);
     std::vector<Token> output;
     std::stack<Token> stack;
@@ -142,6 +148,29 @@ float Calculator::calculate(std::string expression){
         output.push_back(stack.top());
         stack.pop();
     }
+    // проверка на наличие переменных и их инициализация
+
+    std::map<std::string, float> vars;
+    std::vector<Token*> vars_vector;
+
+    for(int i{}; i < output.size(); ++i){
+        if(output[i].type == VAR){
+            vars[output[i].var] = -1;
+            vars_vector.push_back(&output[i]);
+        }
+    }
+    if(!vars.empty()){
+        std::cout << "Введите значение переменных\n";
+        for(auto var: vars){
+            std::cout << var.first << " = ";
+            std::cin >> vars[var.first];
+            std::cin.ignore(); // очистка буфера, чтобы не оставались лишние знаки переноса строки
+        }
+        for(int i{}; i < vars_vector.size(); ++i){
+            vars_vector[i]->value = vars[vars_vector[i]->var];
+        }
+    }
+    // вычисление результата
     for(int i{}; i < output.size(); ++i){
         if(output[i].type == NUMB || output[i].type == VAR){
             stack.push(output[i]);
